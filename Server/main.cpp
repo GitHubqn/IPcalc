@@ -1,3 +1,4 @@
+//						SERVER
 #include<iostream>
 #include<WinSock2.h>
 #include<WS2tcpip.h>
@@ -14,14 +15,48 @@ using std::endl;
 
 #pragma comment(lib, "Ws2_32.lib")
 
+union ClientSocketData
+{
+	SOCKADDR client_socket;
+	unsigned long long data;
+	ClientSocketData(SOCKADDR client_socket) 
+	{
+		this->client_socket = client_socket;
+	}
+	unsigned long long get_data()const 
+	{
+		return data;
+	}
+
+	unsigned short get_port()const 
+	{
+		int i_port = (data >> 16) & 0xFFFF;
+		return i_port;
+	}
+	char* get_socket(char* sz_client_name)const 
+	{
+		sprintf
+		(
+			sz_client_name,
+			"%i.%i.%i.%i:%i",
+			(unsigned char)client_socket.sa_data[2],
+			(unsigned char)client_socket.sa_data[3],
+			(unsigned char)client_socket.sa_data[4],
+			(unsigned char)client_socket.sa_data[5],
+			get_port()
+		);
+		return sz_client_name;
+	}
+};
+
 void main()
 {
-	setlocale(LC_ALL, " ");
+	setlocale(LC_ALL, "");
 
 	//1. инициализация winsock
 	WSADATA wsaData;
 	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (iResult!=0)
+	if (iResult != 0)
 	{
 		cout << "WinSock initialization failed with error #" << iResult << endl;
 		return;
@@ -69,7 +104,7 @@ void main()
 
 	//4. Прослушиваем порт
 	iResult = listen(ListenSocket, SOMAXCONN);
-	if (iResult == SOCKET_ERROR) 
+	if (iResult == SOCKET_ERROR)
 	{
 		cout << "Listen failed with error #" << WSAGetLastError() << endl;
 		closesocket(ListenSocket);
@@ -77,54 +112,79 @@ void main()
 		return;
 	}
 	cout << "Server started on " << DEFAULT_PORT << endl;
-
-	//5. Сокет клиента
-	SOCKET ClientSocket = accept(ListenSocket, NULL, NULL);
-	if (ClientSocket == INVALID_SOCKET) 
+	do
 	{
-		cout<<"Accept failed with error #" << WSAGetLastError() << endl;
-		closesocket(ListenSocket);
-		WSACleanup();
-		return;
-	}
-
-	//6. Получение и отправка данных
-	char recvbuffer[BUFFER_SIZE]{};
-	int received = 0;
-	do {
-		received = recv(ClientSocket, recvbuffer, BUFFER_SIZE, 0);
-		if (received > 0)
+		//5. Сокет клиента
+		SOCKET ClientSocket = accept(ListenSocket, NULL, NULL);
+		if (ClientSocket == INVALID_SOCKET)
 		{
-			cout << "Bytes received: \t" << received << endl;
-			cout << "Recived message:\t" << recvbuffer << endl;
-			int iSendResult = send(ClientSocket, "Привет Client", received, 0);
-			if (iSendResult == SOCKET_ERROR)
+			cout << "Accept failed with error #" << WSAGetLastError() << endl;
+			closesocket(ListenSocket);
+			WSACleanup();
+			return;
+		}
+
+		CHAR sz_client_name[32];
+		int namelen = 32;
+		SOCKADDR client_socket;
+		ZeroMemory(&client_socket, sizeof(client_socket));
+		SOCKET ClientSocket = accept(ListenSocket, &client_socket, &namelen);
+
+		//getsockname(ClientSocket, &client_socket, &namelen);
+		/*sprintf
+		(
+			sz_client_name,
+			"%i.%i.%i.%i:%i",
+			(unsigned char)client_socket.sa_data[2],
+			(unsigned char)client_socket.sa_data[3],
+			(unsigned char)client_socket.sa_data[4],
+			(unsigned char)client_socket.sa_data[5],
+			(unsigned char)client_socket.sa_data[0] * 256 + (unsigned char)client_socket.sa_data[1]
+		);
+		cout << sz_client_name << endl;*/
+		ClientSocketData client_data(client_socket);
+		cout << "Client: " << ClientSocketData(client_socket).get_socket(sz_client_name) << endl;
+
+
+		//6. Получение и отправка данных
+		char recvbuffer[BUFFER_SIZE]{};
+		int received = 0;
+		do {
+			received = recv(ClientSocket, recvbuffer, BUFFER_SIZE, 0);
+			if (received > 0)
 			{
-				cout << "Send failed with error #" << WSAGetLastError() << endl;
+				cout << "Bytes received: \t" << received << endl;
+				cout << "Recived message:\t" << recvbuffer << endl;
+				int iSendResult = send(ClientSocket, "Привет Client", received, 0);
+				if (iSendResult == SOCKET_ERROR)
+				{
+					cout << "Send failed with error #" << WSAGetLastError() << endl;
+					closesocket(ClientSocket);
+					WSACleanup();
+					return;
+				}
+				cout << "Bytes sent: " << iSendResult << endl;
+			}
+			else if (received == 0)	cout << "Connection closing..." << endl;
+			else
+			{
+				cout << "Received failed with error #" << WSAGetLastError() << endl;
 				closesocket(ClientSocket);
 				WSACleanup();
 				return;
 			}
-			cout << "Bytes sent: " << iSendResult << endl;
-		}
-		else if (received == 0)	cout << "Connection closing..." << endl;
-		else
-		{
-			cout <<"Received failed with error #" << WSAGetLastError() << endl;
-			closesocket(ClientSocket);
-			WSACleanup();
-			return;
-		}
-	} while (received > 0);
+		} while (received > 0);
 
-	//7.Отключить соединения
-	iResult = shutdown(ClientSocket, SD_SEND);
-	if (iResult == SOCKET_ERROR)
-	{
-		cout << "Shutdown failed with error #" << WSAGetLastError() << endl;
-		
-	}
-	closesocket(ClientSocket);
+		//7.Отключить соединения
+		iResult = shutdown(ClientSocket, SD_SEND);
+		if (iResult == SOCKET_ERROR)
+		{
+			cout << "Shutdown failed with error #" << WSAGetLastError() << endl;
+
+		}
+		closesocket(ClientSocket);
+	} while (true);
+
 	WSACleanup();
 	system("PAUSE");
 }

@@ -14,9 +14,10 @@ using std::endl;
 
 #pragma comment(lib, "Ws2_32.lib")
 
+//						CLIENT
 void main()
 {
-	setlocale(LC_ALL, " ");
+	setlocale(LC_ALL, "");
 
 	WSADATA wsaData;
 	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -112,6 +113,7 @@ void main()
 	{
 		cout << "Shutdown failed with error #" << WSAGetLastError() << endl;
 	}
+
 	closesocket(ConnectSocket);
 	WSACleanup();
 	system("PAUSE");
