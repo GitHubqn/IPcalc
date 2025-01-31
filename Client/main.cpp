@@ -130,6 +130,11 @@ void main()
 		}
 		else if (received == 0)cout << "Connection closed" << endl;
 		else cout << "Receive failed with error #" << WSAGetLastError() << endl;
+		if (strcmp(recvbuffer, "No free connections left") == 0)
+		{
+			cout << recvbuffer << endl;
+			break;
+		}
 		//} while (received > 0);
 		if (!exit)
 		{
